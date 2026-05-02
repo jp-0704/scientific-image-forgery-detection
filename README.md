@@ -228,16 +228,33 @@ For a static screenshot tour of the app, see the **Performance** tab artefacts i
 
 If this code or the trained weights help your research, please cite:
 
+**Modern (biblatex / `@software`):**
+
 ```bibtex
-@misc{jayavikram2026forgery,
-  author       = {Jayavikram},
-  title        = {Scientific Image Forgery Detection: Dual-Task Deep Learning with CBAM-UNet},
-  year         = {2026},
-  publisher    = {GitHub},
-  journal      = {GitHub repository},
-  howpublished = {\url{https://github.com/jp-0704/scientific-image-forgery-detection}}
+@software{jayavikram2026forgery,
+  author  = {{Jayavikram}},
+  title   = {Scientific Image Forgery Detection: Dual-Task Deep Learning with CBAM-UNet},
+  year    = {2026},
+  version = {0.1.0},
+  url     = {https://github.com/jp-0704/scientific-image-forgery-detection}
 }
 ```
+
+**Legacy BibTeX (`@misc`):**
+
+```bibtex
+@misc{jayavikram2026forgery,
+  author       = {{Jayavikram}},
+  title        = {Scientific Image Forgery Detection: Dual-Task Deep Learning with CBAM-UNet},
+  year         = {2026},
+  howpublished = {\url{https://github.com/jp-0704/scientific-image-forgery-detection}},
+  note         = {GitHub repository, version 0.1.0}
+}
+```
+
+> The double braces `{{Jayavikram}}` are intentional — they tell BibTeX to treat the name as one atomic unit instead of trying to split it into first/last components.
+
+GitHub also displays a **"Cite this repository"** button at the top-right of the repo page that auto-generates BibTeX, APA, and other formats from this project's `CITATION.cff`.
 
 ---
 

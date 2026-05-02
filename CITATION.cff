@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+title: "Scientific Image Forgery Detection: Dual-Task Deep Learning with CBAM-UNet"
+message: "If this code or the trained weights help your research, please cite as below."
+type: software
+authors:
+  - name: "Jayavikram"
+    alias: "jp-0704"
+repository-code: "https://github.com/jp-0704/scientific-image-forgery-detection"
+url: "https://jp-0704.github.io/scientific-image-forgery-detection/"
+abstract: >-
+  Dual-task deep learning model for scientific image forgery detection.
+  Classifies images as authentic or forged and localises the copy-move
+  region pixel-by-pixel. Four encoder architectures benchmarked on the
+  RECOD.ai Kaggle competition (EfficientNet-B4, ConvNeXt-Tiny,
+  Swin-V2-Tiny, Swin-V2-Base) with a unified CBAM-UNet decoder and deep
+  supervision. Best model (Swin-V2-Tiny, 28M params) achieves AUC 0.9463
+  and Dice 0.5755 on the held-out validation split. Includes a local
+  Streamlit webapp with FP16 + 4-fold TTA inference, and a fully
+  self-contained training pipeline tuned for Kaggle's 2x T4 environment.
+keywords:
+  - deep-learning
+  - image-forensics
+  - copy-move-forgery
+  - scientific-image-integrity
+  - semantic-segmentation
+  - multi-task-learning
+  - swin-transformer
+  - convnext
+  - pytorch
+  - streamlit
+license: MIT
+version: "0.1.0"
+date-released: "2026-05-02"
