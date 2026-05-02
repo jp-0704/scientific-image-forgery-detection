@@ -1,0 +1,10 @@
+# Webapp dependencies — latest versions, no upper bounds.
+# Minimum versions only where a specific feature is required.
+
+streamlit>=1.30          # st.tabs, modern file_uploader
+torch>=2.0               # weights_only=False kwarg in torch.load
+timm>=0.9                # ConvNeXt + Swin-V2 model zoo
+numpy
+pandas
+opencv-python-headless
+scipy

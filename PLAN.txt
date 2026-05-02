@@ -1,0 +1,254 @@
+================================================================================
+SCIENTIFIC IMAGE FORGERY DETECTION — PROJECT PLAN
+================================================================================
+Project root  : /home/jp/projects/recod/
+Date locked   : 2026-05-01
+Hardware      : Kaggle 2x Tesla T4 (15 GB VRAM each, 30 GB RAM)
+                Local: NVIDIA RTX 3050 Ti (4 GB VRAM)
+Constraint    : 5 days available, no time pressure on training
+Goal          : Train 3 new models, compare with EfficientNet-B4 baseline,
+                ship a local Streamlit webapp for image upload + prediction.
+
+================================================================================
+1. BASELINE (already trained, in final_model_v3.pt)
+================================================================================
++-----------------------+--------------------------------------------+
+| Property              | Value                                      |
++-----------------------+--------------------------------------------+
+| Architecture          | EfficientNet-B4 + CBAM-UNet + Deep Sup.    |
+| Notebook              | review2.ipynb (eval) / review-final.ipynb  |
+| Parameters            | ~19 M                                      |
+| Val AUC               | 0.8433                                     |
+| Val Accuracy          | 0.7167                                     |
+| Val F1                | 0.7612                                     |
+| Val Forged Recall     | 0.9020   (sensitivity)                     |
+| Val Specificity       | 0.5309   (WEAK — too many false positives) |
+| Val Mean Dice         | 0.5043                                     |
+| Best threshold        | 0.40                                       |
++-----------------------+--------------------------------------------+
+
+Diagnosis: model is sensitive but not specific.  The 3 new architectures are
+chosen to attack the specificity gap from different angles.
+
+================================================================================
+2. THE THREE NEW MODELS
+================================================================================
++----+--------------------+---------+---------+---------------+----------+
+| #  | Model              | Params  | Encoder | Decoder       | Notebook |
++----+--------------------+---------+---------+---------------+----------+
+| 1  | ConvNeXt-Tiny      |  ~28 M  | 4-level | CBAM-UNet+DS  | train_1  |
+| 2  | Swin-V2-Tiny       |  ~28 M  | 4-level | CBAM-UNet+DS  | train_2  |
+| 3  | Swin-V2-Base       |  ~88 M  | 4-level | CBAM-UNet+DS  | train_3  |
++----+--------------------+---------+---------+---------------+----------+
+
+DS = Deep Supervision (auxiliary heads at intermediate decoder levels)
+
+WHY THESE THREE?
+- Model 1 (ConvNeXt-Tiny):  modern conv, parameter-efficient, sharp local features
+- Model 2 (Swin-V2-Tiny):   self-attention -> non-local matching for copy-move
+- Model 3 (Swin-V2-Base):   heavy attention model, target for best specificity
+
+REJECTED ALTERNATIVES
+- HRNet-W32       : strong but no recent gains over ConvNeXt
+- SegFormer       : segmentation-only, awkward for dual-task head
+- DenseNet-201    : older, no advantage over ConvNeXt
+- ResNet-50       : already covered in review-1.ipynb
+- MaxViT          : interesting but unstable timm weights
+
+================================================================================
+3. SHARED ARCHITECTURE (all 4 models)
+================================================================================
+
+Input image [B, 3, 512, 512]
+        |
+        v
+   +-------------------+
+   | ENCODER           |  <-- backbone-specific (Eff-B4 / ConvNeXt / Swin / Swin-B)
+   | (4 or 5 levels)   |
+   +-------------------+
+        |  features f0..fN
+        |
+        +--> Classification head:  AdaptiveAvgPool(fN) -> FC -> Dropout -> FC -> 1 logit
+        |
+        v
+   +-------------------------------+
+   | CBAM-UNet DECODER (shared)    |
+   |                               |
+   |  d_top    + skip + CBAM       |---> aux_head_4 (deep supervision, downsampled)
+   |  d_mid    + skip + CBAM       |---> aux_head_3 (deep supervision, downsampled)
+   |  d_low    + skip + CBAM       |
+   |  d_final  + 4x upsample       |
+   |                               |
+   |  seg_head (1x1 conv)          |---> [B, 1, 512, 512]
+   +-------------------------------+
+
+
+CBAM (Convolutional Block Attention Module):
+  - Channel attention:  AvgPool + MaxPool -> shared MLP -> sigmoid(sum)
+  - Spatial attention:  Concat(avg over C, max over C) -> 7x7 conv -> sigmoid
+
+Deep Supervision:
+  - Auxiliary segmentation heads at intermediate decoder depths
+  - Ground-truth masks downsampled (AdaptiveAvgPool) to match
+  - Only contributes to training loss; discarded at inference
+
+================================================================================
+4. PER-MODEL HYPERPARAMETERS
+================================================================================
++--------------------+------+--------+----------+--------+-------------+--------+
+| Model              | bs   | epochs | grad_acc | enc_LR | dec_LR      | AMP    |
++--------------------+------+--------+----------+--------+-------------+--------+
+| ConvNeXt-Tiny      | 12   | 60     | 1        | 3e-5   | 3e-4        | yes    |
+| Swin-V2-Tiny       |  8   | 60     | 1        | 3e-5   | 3e-4        | yes    |
+| Swin-V2-Base       |  4   | 60     | 4        | 2e-5   | 2e-4        | yes    |
++--------------------+------+--------+----------+--------+-------------+--------+
+
+Common to all:
+  - Optimizer:        AdamW (weight_decay=1e-4)
+  - Schedule:         5 ep linear warmup + cosine annealing to 1% of peak LR
+  - Gradient clip:    max_norm = 1.0
+  - Patience:         8 (early stop on composite val metric)
+  - Cls loss:         Focal (alpha=0.5, gamma=2.0)
+  - Seg loss:         BCE + Tversky (alpha=0.3, beta=0.7)
+  - Loss weights:     CLS=2.0, SEG=1.0, AUX=0.4
+  - Class balance:    WeightedRandomSampler (1/freq per class)
+  - Image size:       512 x 512
+  - Composite metric: 0.4*AUC + 0.3*ForgedRecall + 0.3*Dice
+  - DataParallel:     2 GPUs (T4 x2 on Kaggle)
+
+Swin-V2-Base SPECIFIC (heavy model):
+  - Gradient checkpointing on encoder ON
+  - OOM fallback chain: bs=4 -> bs=2 (grad_acc 2x) -> bs=1 (grad_acc 4x)
+
+================================================================================
+5. REPRODUCIBILITY
+================================================================================
+- SEED                  = 42
+- VAL_FRAC              = 0.15
+- Split done at UID level (paired authentic/forged stay together)
+- Supplemental images always assigned to train
+- random.seed + np.random.seed + torch.manual_seed + cudnn.deterministic = True
+
+This guarantees the SAME 713-sample val set is used by all 4 models for
+fair head-to-head comparison.
+
+================================================================================
+6. OUTPUT DIRECTORY LAYOUT
+================================================================================
+recod/
+  outputs/
+    convnext_tiny/
+      model.pt             <- weights + threshold + metadata bundle
+      history.csv          <- per-epoch train/val metrics
+      metrics.json         <- final eval metrics
+      dashboard.png        <- score dist + confusion matrix + ROC
+      predictions.png      <- 12-image qualitative grid
+      training_curves.png  <- 4-panel loss/metric plot
+    swin_v2_tiny/   {same files}
+    swin_v2_base/   {same files}
+    baseline_efficientnet/
+      model.pt             <- copy of final_model_v3.pt
+      metrics.json         <- copied from review2.ipynb output
+    comparison/
+      comparison.csv       <- side-by-side metrics
+      comparison_dashboard.png
+      roc_overlay.png      <- 4 ROC curves
+      winner.json          <- chosen by composite score
+
+NO file overlap between notebooks. Each writes ONLY to its own subdirectory.
+
+================================================================================
+7. MEMORY HYGIENE (research-grade)
+================================================================================
+Every notebook ends with:
+  del model, optimizer, scaler, train_loader, val_loader
+  gc.collect()
+  torch.cuda.empty_cache()
+  torch.cuda.reset_peak_memory_stats()
+  print(f'Peak VRAM used: {torch.cuda.max_memory_allocated()/1e9:.2f} GB')
+
+DataLoader rules:
+  - num_workers = 2 (more triggers shutdown bugs on Kaggle)
+  - persistent_workers = False
+  - pin_memory = True
+  - drop_last = True (train only)
+
+Cell ordering enforces single-pass execution. Restart kernel between notebooks.
+
+================================================================================
+8. COMPARISON NOTEBOOK
+================================================================================
+File: compare_models.ipynb
+
+Logic:
+  for each of {efficientnet_b4, convnext_tiny, swin_v2_tiny, swin_v2_base}:
+      load weights
+      run val_loader inference (same 713 samples)
+      sweep threshold for best F1
+      compute Acc/AUC/F1/Spec/FgRec/Dice at best F1 threshold
+
+Outputs:
+  - comparison.csv  (rows = models, cols = metrics)
+  - comparison_dashboard.png  (grouped bar charts)
+  - roc_overlay.png  (4 ROC curves on one axis)
+  - winner.json     (model with highest composite)
+
+================================================================================
+9. LOCAL WEBAPP
+================================================================================
+Stack:        Streamlit + PyTorch + Albumentations
+Hardware:     RTX 3050 Ti (4 GB VRAM)
+Inference:    FP16 + sequential 4-fold TTA, OOM-safe with CPU fallback
+
+VRAM budget per model (FP16 inference + TTA peak):
+  EfficientNet-B4   ~1.4 GB   (fits comfortably)
+  ConvNeXt-Tiny     ~1.6 GB   (fits comfortably)
+  Swin-V2-Tiny      ~1.8 GB   (fits)
+  Swin-V2-Base      ~2.8 GB   (tight; will work with TTA off if needed)
+
+Webapp tabs:
+  1. Single Image      drag-drop -> label, confidence, heatmap, mask
+  2. Batch / Folder    upload zip -> CSV of predictions, optional Dice if mask supplied
+  3. Compare Models    same image, all 4 models side-by-side
+  4. Performance       static comparison dashboard from outputs/comparison/
+
+Files (under webapp/):
+  app.py            Streamlit entry, tab routing
+  inference.py      Model loading, FP16, TTA, post-processing, OOM fallback
+  arch.py           Shared model classes (CBAM, DecoderBlock, all 4 wrappers)
+  components.py     Streamlit UI primitives, upload widgets, plot helpers
+  requirements.txt  Pinned dependencies
+  README.md         1-command run instructions
+  models/           {symlinks or copies of trained .pt files}
+
+Run command:
+  cd webapp && pip install -r requirements.txt && streamlit run app.py
+
+================================================================================
+10. SCHEDULE
+================================================================================
+Day 1 : Run train_1_convnext_tiny.ipynb on Kaggle  (~3 h compute)
+Day 2 : Run train_2_swin_v2_tiny.ipynb on Kaggle   (~4 h compute)
+Day 3 : Run train_3_swin_v2_base.ipynb on Kaggle   (~10 h compute, overnight)
+Day 4 : Run compare_models.ipynb                    (~30 min)
+Day 5 : Test webapp locally on RTX 3050 Ti          (~1 h)
+
+================================================================================
+11. RISK REGISTER
+================================================================================
++----------------------------------------+------------------------------------+
+| Risk                                   | Mitigation                         |
++----------------------------------------+------------------------------------+
+| Swin-V2-Base OOM on 2x T4              | grad checkpointing + AMP +         |
+|                                        | bs fallback chain 4->2->1          |
+| Kaggle 12 h kernel timeout (swin-base) | patience=8 + checkpoint resume     |
+| Swin-V2 weights download blocked       | pre-download to Kaggle dataset     |
+| All 3 new models worse than baseline   | webapp ships baseline as default   |
+| RTX 3050 Ti webapp OOM                 | FP16 -> no-TTA -> CPU fallback     |
+| File / cell-state leakage              | unique output dirs + kernel        |
+|                                        | restart between notebooks          |
++----------------------------------------+------------------------------------+
+
+================================================================================
+END OF PLAN
+================================================================================

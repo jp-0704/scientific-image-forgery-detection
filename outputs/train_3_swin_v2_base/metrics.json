@@ -1,0 +1,17 @@
+{
+  "model_name": "swin_v2_base",
+  "display": "Swin-V2-Base + CBAM-UNet + Deep Supervision",
+  "threshold": 0.5400000000000001,
+  "accuracy": 0.82328190743338,
+  "auc": 0.9156831271834577,
+  "precision": 0.793893129568984,
+  "forged_recall": 0.8739495795871289,
+  "specificity": 0.7724719098953731,
+  "f1": 0.8319999998890667,
+  "mean_dice": 0.5005449056625366,
+  "composite": 0.7786215964482828,
+  "cm_tn": 275,
+  "cm_fp": 81,
+  "cm_fn": 45,
+  "cm_tp": 312
+}

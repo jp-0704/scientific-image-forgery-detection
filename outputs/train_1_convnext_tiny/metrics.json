@@ -1,0 +1,16 @@
+{
+  "model_name": "convnext_tiny",
+  "display": "ConvNeXt-Tiny + CBAM-UNet + Deep Supervision",
+  "threshold": 0.55,
+  "accuracy": 0.8710,
+  "auc": 0.9421,
+  "precision": 0.9027,
+  "forged_recall": 0.8319,
+  "specificity": 0.9101,
+  "f1": 0.8659,
+  "mean_dice": 0.5562,
+  "composite": 0.7933,
+  "cm_tn": 324, "cm_fp": 32, "cm_fn": 60, "cm_tp": 297,
+  "params_m": 28.6,
+  "source": "train_1_convnext_tiny.ipynb"
+}

@@ -1,0 +1,17 @@
+{
+  "model_name": "swin_v2_tiny",
+  "display": "Swin-V2-Tiny + CBAM-UNet + Deep Supervision",
+  "threshold": 0.5100000000000001,
+  "accuracy": 0.85273492286115,
+  "auc": 0.9462594026374594,
+  "precision": 0.8351063827566206,
+  "forged_recall": 0.8795518204819182,
+  "specificity": 0.8258426963972352,
+  "f1": 0.8567530694601975,
+  "mean_dice": 0.5754563808441162,
+  "composite": 0.815006221452794,
+  "cm_tn": 294,
+  "cm_fp": 62,
+  "cm_fn": 43,
+  "cm_tp": 314
+}
