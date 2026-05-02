@@ -229,13 +229,13 @@ For a static screenshot tour of the app, see the **Performance** tab artefacts i
 If this code or the trained weights help your research, please cite:
 
 ```bibtex
-@misc{prakash2026forgery,
-  author       = {Jaya Vikram Prakash},
+@misc{jayavikram2026forgery,
+  author       = {Jayavikram},
   title        = {Scientific Image Forgery Detection: Dual-Task Deep Learning with CBAM-UNet},
   year         = {2026},
   publisher    = {GitHub},
   journal      = {GitHub repository},
-  howpublished = {\url{https://github.com/jp-0704/<REPO>}}
+  howpublished = {\url{https://github.com/jp-0704/scientific-image-forgery-detection}}
 }
 ```
 
